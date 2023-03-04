@@ -1,0 +1,217 @@
+#!/bin/bash
+
+# base64url is a Bash encoder/decoder for the base64url format
+# (base64 with an URL and filename safe alphabet). It's described in the
+# [RFC 4648 (section 5)](https://www.rfc-editor.org/rfc/rfc4648#section-5).
+# For more details, run `base64url -h`.
+base64url() {
+	local OPTIND opt
+	local convert_to_base64 convert_to_base64url decode display_help file
+	local help_msg ignore_garbage padding standard wrap
+	declare -a cmd_args
+	
+	# ----------
+	
+	read -d '' -r help_msg <<-'HD'
+		base64url - base64url encode/decode data
+		
+		Usage: base64url [-b] [-d] [-h] [-i] [-p] [-s] [-u] [-w INT] [FILE]
+		
+		  -b:     Convert a base64url string to a standard base64 string.
+		  -d:     Decode a base64/base64url string.
+		  -h:     Display help.
+		  -i:     Ignore non-alphabet characters (when "-d" is used).
+		  -p:     Add padding ("=") at the end of the base64/base64url string.
+		  -s:     Encode to a standard base64 string.
+		  -u:     Convert a standard base64 string to base64url.
+		  -w INT: Wrap the base64 string after INT characters (disabled by default).
+		
+		Examples:
+		
+		    base64_string=$(echo -n 'q6?AZrfG>ae' | base64url -s)
+		    base64url_string=$(echo -n 'q6?AZrfG>ae' | base64url)
+		    
+		    # Display help
+		    base64url -h
+		    
+		    # Convert a base64url string to standard base64
+		    echo -n "$base64url_string" | base64url -b
+		    
+		    # Convert a base64 string to base64url
+		    echo -n "$base64_string" | base64url -u
+		    
+		    # Decode a base64url string saved in a file
+		    base64url -d "$file"
+		    
+		    # Decode a base64url string
+		    echo -n "$base64url_string" | base64url -d
+		    
+		    # Decode a base64url string and ignore non-alphabet characters
+		    echo -n "$base64url_string" | base64url -d -i
+		    
+		    # Encode a file to base64url, add padding and wrap the output
+		    base64url -p -w 80 "$file"
+		    
+		    # Encode a string to base64url
+		    echo -n "Lorem ipsum" | base64url
+		    
+		    # Encode a file to a standard base64 string
+		    base64url -s "$file"
+	HD
+	help_msg=$'\n'$help_msg$'\n'
+	
+	# Arguments
+	###########
+	
+	convert_to_base64=false    # -b
+	decode=false               # -d
+	display_help=false         # -h
+	ignore_garbage=false       # -i
+	padding=false              # -p
+	standard=false             # -s
+	convert_to_base64url=false # -u
+	wrap=0                     # -w INT
+	
+	while getopts ":bdhipsuw:" opt; do
+		case "$opt" in
+			b)
+				convert_to_base64=true
+				;;
+			d)
+				decode=true
+				;;
+			h)
+				display_help=true
+				;;
+			i)
+				ignore_garbage=true
+				;;
+			p)
+				padding=true
+				;;
+			s)
+				standard=true
+				;;
+			u)
+				convert_to_base64url=true
+				;;
+			w)
+				wrap=$OPTARG
+				;;
+			*)
+				display_help=true
+				;;
+		esac
+	done
+	
+	if [[ $decode == false ]]; then
+		ignore_garbage=false
+	fi
+	
+	if [[ ! $wrap =~ ^(0|[1-9][0-9]*)$ ]]; then
+		wrap=0
+	fi
+	
+	shift $((OPTIND-1))
+	
+	# file
+	if [[ -n $1 ]]; then
+		file=$1
+		
+		if [[ ! -f $file ]]; then
+			echo "The file \"$file\" doesn't exist." 1>&2
+			
+			return 1
+		fi
+	fi
+	
+	# Exports
+	#########
+	
+	B64URL_PADDING=$padding
+	export B64URL_PADDING
+	
+	# Helper functions
+	##################
+	
+	padding() {
+		sed -Ez 's/^[\n\r\t ]+//; s/[\n\r\t ]+$//; s/=+$//;' | \
+		{ ( [[ $B64URL_PADDING == true ]] && sed -E 's/$/====/; s/.{4}/&\n/g; s/\n=+\n?$//; s/\n//g' ) || cat; }
+	}
+	
+	# Display help
+	##############
+	
+	if [[ $display_help == true ]]; then
+		echo "$help_msg"
+		
+		return 0
+	fi
+	
+	# Convert to standard base64
+	############################
+	
+	if [[ $convert_to_base64 == true ]]; then
+		if [[ -f $file ]]; then
+			tr -- '-_' '+/' < "$file" | padding
+		else
+			cat | tr -- '-_' '+/' | padding
+		fi
+		
+		return 0
+	fi
+	
+	# Convert to base64url
+	######################
+	
+	if [[ $convert_to_base64url == true ]]; then
+		if [[ -f $file ]]; then
+			tr '+/' '-_'  < "$file" | padding
+		else
+			cat | tr '+/' '-_' | padding
+		fi
+		
+		return 0
+	fi
+	
+	# Decode
+	########
+	
+	if [[ $decode == true ]]; then
+		B64URL_PADDING=true
+		export B64URL_PADDING
+		
+		cmd_args=(-d)
+		
+		if [[ $ignore_garbage == true ]]; then
+			cmd_args+=(-i)
+		fi
+		
+		if [[ -f $file ]]; then
+			tr -- '-_' '+/' < "$file" | padding | base64 "${cmd_args[@]}"
+		else
+			cat | tr -- '-_' '+/' | padding | base64 "${cmd_args[@]}"
+		fi
+		
+		return 0
+	fi
+	
+	# Encode
+	########
+	
+	cmd_args=(-w "$wrap")
+	
+	if [[ -f $file ]]; then
+		if [[ $standard == true ]]; then
+			base64 "${cmd_args[@]}" "$file" | padding
+		else
+			base64 "${cmd_args[@]}" "$file" | tr '+/' '-_' | padding
+		fi
+	elif [[ $standard == true ]]; then
+		cat | base64 "${cmd_args[@]}" | padding
+	else
+		cat | base64 "${cmd_args[@]}" | tr '+/' '-_' | padding
+	fi
+	
+	return 0
+}
