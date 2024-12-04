@@ -1,4 +1,4 @@
-# About
+# base64url
 
 base64url is a Bash encoder/decoder for the base64url format
 (base64 with an URL and filename safe alphabet). It's described
@@ -34,11 +34,21 @@ Here's the table (Value / Encoding):
 | 15 P | 32 g | 49 x |                  |
 | 16 Q | 33 h | 50 y | (pad) =          |
 
-For more details and examples, run `base64url -h`.
+## Installation
 
-# License
+- Get the [latest version of `base64url` on GitHub](https://github.com/misaki-web/base64url/archive/refs/heads/main.zip).
 
-Copyright (C) 2023  Misaki F. <https://github.com/misaki-web/base64url
+- Unzip the downloaded archive and locate the folder `base64url-main`.
+
+- Open a terminal and source the function: `source /path/to/base64url-main/base64url`
+
+## Usage
+
+`base64url` can now be invoked directly from the terminal. It supports encoding, decoding, and format conversions between base64 and base64url. For details and examples, run `base64url -h`.
+
+## License
+
+Copyright (C) 2023-2024  Misaki F. <https://github.com/misaki-web/base64url
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
